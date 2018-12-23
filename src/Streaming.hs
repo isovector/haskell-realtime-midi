@@ -58,7 +58,7 @@ eventParse = do
       False -> NoteOff c n v
 
 
-runStream :: Show a => (Message -> Maybe a) -> IO ()
+runStream :: Show b => (S.Stream (S.Of Message) IO () -> S.Stream (S.Of b) IO ()) -> IO ()
 runStream f = do
   (_, Just pout, _, _) <-
     createProcess $
@@ -66,7 +66,7 @@ runStream f = do
   hSetBinaryMode pout True
 
   S.print
-    . S.mapMaybe f
+    . f
     . void
     . A.parsed (eventParse)
     . C8.drop (fromIntegral . length @[] $ "Waiting for data. Press Ctrl+C to end.\nSource  Event                  Ch  Data\n")

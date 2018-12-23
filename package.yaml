@@ -29,6 +29,7 @@ dependencies:
 - bytestring
 - HCodecs
 - Euterpea
+- containers
 
 library:
   source-dirs: src
