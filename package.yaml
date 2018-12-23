@@ -27,6 +27,8 @@ dependencies:
 - streaming-bytestring
 - process
 - bytestring
+- HCodecs
+- Euterpea
 
 library:
   source-dirs: src
