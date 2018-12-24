@@ -1,8 +1,12 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveFunctor    #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase       #-}
 
 module Lib where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.State.Class
+import           Control.Monad.Trans.State (evalStateT)
 import           Data.List (minimumBy)
 import           Data.Ord (comparing)
 import           Data.Set (Set)
@@ -14,26 +18,32 @@ import qualified Streaming.Prelude as S
 import           StreamingMidi
 
 
-data Chord
-  = Maj  PitchClass
-  | Min  PitchClass
-  | Maj7 PitchClass
-  | Min7 PitchClass
-  | Dom7 PitchClass
-  | Over Chord PitchClass
-  deriving (Eq, Ord, Show)
+data Chord a
+  = Maj  a
+  | Min  a
+  | Maj7 a
+  | Min7 a
+  | Dom7 a
+  | Over (Chord a) a
+  deriving (Eq, Ord, Show, Functor)
 
 
-matches :: Chord -> Set Pitch -> Bool
+rotate5 :: PitchClass -> PitchClass
+rotate5 pc = fst $ trans 7 (pc, 4)
+
+
+matches :: Chord PitchClass -> Set Pitch -> Bool
 matches (Maj  r) ps = matchSemitones r [0, 4, 7] ps
 matches (Maj7 r) ps = matchSemitones r [0, 4, 7, 11] ps
 matches (Dom7 r) ps = matchSemitones r [0, 4, 7, 10] ps
 matches (Min  r) ps = matchSemitones r [0, 3, 7] ps
 matches (Min7 r) ps = matchSemitones r [0, 3, 7, 10] ps
-matches (Over c b) ps =
-  let bp  = minimumBy (comparing swap) ps
-      ps' = Set.delete bp ps
-   in fst bp == b && matches c ps'
+matches (Over c b) ps
+  | Set.null ps = False
+  | otherwise =
+      let bp  = minimumBy (comparing swap) ps
+          ps' = Set.delete bp ps
+       in fst bp == b && matches c ps'
 
 
 matchSemitones :: PitchClass -> [Int] -> Set Pitch -> Bool
@@ -43,11 +53,31 @@ matchSemitones r ts ps = (== Set.map fst ps)
 
 
 main :: IO ()
-main = S.print
-     . S.filter (matches $ Maj7 D `Over` A)
-     . S.filter (not . Set.null)
+main = flip evalStateT (Min C)
+     . S.print
+     . S.mapMaybeM onChord
      . keysDown
      $ midiStream 20
+
+
+onChord :: MonadState (Chord PitchClass) m => Set Pitch -> m (Maybe (Chord PitchClass))
+onChord ps = do
+  c <- get
+  case matches c ps of
+    True  -> do
+      let c' = fmap (canonicalize . rotate5) c
+      put c'
+      pure $ Just c'
+    False -> pure Nothing
+
+
+canonicalize :: PitchClass -> PitchClass
+canonicalize As = Bf
+canonicalize Cs = Df
+canonicalize Ds = Ef
+canonicalize Fs = Gf
+canonicalize Gs = Af
+canonicalize z  = z
 
 
 keysDown
