@@ -2,12 +2,13 @@
 {-# LANGUAGE TypeApplications  #-}
 
 module Streaming
-  ( runStream
+  ( midiStream
   , Message (..)
   ) where
 
 import           Codec.Midi (Message (..))
 import           Control.Monad
+import           Control.Monad.IO.Class
 import           Data.Attoparsec.ByteString (Parser)
 import qualified Data.Attoparsec.ByteString.Char8 as A
 import qualified Data.Attoparsec.ByteString.Streaming as A
@@ -58,17 +59,17 @@ eventParse = do
       False -> NoteOff c n v
 
 
-runStream :: Show b => (S.Stream (S.Of Message) IO () -> S.Stream (S.Of b) IO ()) -> IO ()
-runStream f = do
-  (_, Just pout, _, _) <-
-    createProcess $
-      (shell "aseqdump -p 20") { std_out = CreatePipe }
-  hSetBinaryMode pout True
-
-  S.print
-    . f
-    . void
-    . A.parsed (eventParse)
-    . C8.drop (fromIntegral . length @[] $ "Waiting for data. Press Ctrl+C to end.\nSource  Event                  Ch  Data\n")
-    $ C8.hGetContents pout
+midiStream :: MonadIO m => Int -> S.Stream (S.Of Message) m ()
+midiStream dev
+  = void
+  . A.parsed (eventParse)
+  . C8.drop (fromIntegral . length @[] $ "Waiting for data. Press Ctrl+C to end.\nSource  Event                  Ch  Data\n")
+  . (C8.hGetContents =<<)
+  . liftIO $ do
+      (_, Just pout, _, _) <-
+        createProcess $
+          (shell $ "aseqdump -p " ++ show dev)
+            { std_out = CreatePipe }
+      hSetBinaryMode pout True
+      pure pout
 

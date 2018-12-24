@@ -30,6 +30,8 @@ dependencies:
 - HCodecs
 - Euterpea
 - containers
+- mtl
+- transformers
 
 library:
   source-dirs: src
