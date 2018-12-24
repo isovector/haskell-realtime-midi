@@ -7,6 +7,7 @@ module Lib where
 import           Control.Monad.IO.Class
 import           Control.Monad.State.Class
 import           Control.Monad.Trans.State (evalStateT)
+import           Data.Bifunctor (first)
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Euterpea.Music
@@ -18,11 +19,19 @@ import           Utils
 
 main :: IO ()
 main = flip evalStateT (Dom7 C `Over` E)
-     . S.mapM_ (liftIO . putStrLn . showChord)
-     . S.map (fmap canonicalize)
-     . S.mapMaybeM onChord
+     . S.print
+     . S.map (first $ getBeat 60)
+     . clock
      . keysDown
      $ midiStream 20
+
+-- main :: IO ()
+-- main = flip evalStateT (Dom7 C `Over` E)
+--      . S.mapM_ (liftIO . putStrLn . showChord)
+--      . S.map (fmap canonicalize)
+--      . S.mapMaybeM onChord
+--      . keysDown
+--      $ midiStream 20
 
 
 onChord

@@ -1,8 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
+{-# OPTIONS_GHC -Wall  #-}
 
 module StreamingMidi
   ( midiStream
+  , timeValue
+  , getBeat
+  , Duration (..)
+  , clock
   , Message (..)
   ) where
 
@@ -15,17 +20,30 @@ import qualified Data.Attoparsec.ByteString.Char8 as A
 import qualified Data.Attoparsec.ByteString.Streaming as A
 import qualified Data.ByteString.Streaming.Char8 as C8
 import           Data.Foldable
+import           Data.Ratio
 import qualified Streaming.Prelude as S
+import           System.Clock
 import           System.IO
 import           System.Process (createProcess, shell, CreateProcess (..), StdStream (..))
 
 
-headerParse :: Parser ()
-headerParse = void $ do
-  _ <- A.string "Waiting for data. Press Ctrl+C to end.\n"
-  _ <- A.string "Source"
-  _ <- A.takeWhile (/= '\n')
-  A.string "\n"
+data Duration
+  = Whole
+  | Half
+  | Quarter
+  | Eighth
+  | Sixteenth
+  | Dotted Duration
+  deriving (Eq, Ord, Show)
+
+
+timeValue :: Duration -> Rational
+timeValue Whole      = 1
+timeValue Half       = 1 % 2
+timeValue Quarter    = 1 % 4
+timeValue Eighth     = 1 % 8
+timeValue Sixteenth  = 1 % 16
+timeValue (Dotted d) = timeValue d * (3 % 2)
 
 
 spaces :: Parser ()
@@ -80,4 +98,24 @@ midiStream dev
             { std_out = CreatePipe }
       hSetBinaryMode pout True
       pure pout
+
+
+clock
+    :: MonadIO m
+    => S.Stream (S.Of a) m r
+    -> S.Stream (S.Of (TimeSpec, a)) m r
+clock s = do
+  start <- liftIO $ getTime Monotonic
+  flip S.mapM s $ \a -> do
+    now <- liftIO $ getTime Monotonic
+    let diff = diffTimeSpec now start
+    pure (diff, a)
+
+
+getBeat :: Integer -> TimeSpec -> Rational
+getBeat bpm (TimeSpec s ns) =
+  let time  = fromIntegral s + fromIntegral ns % 1000000000  -- in seconds
+      beats = bpm % 60  -- in bpm
+   in (round @Float . fromRational $ time * beats * 32) % 32
+
 

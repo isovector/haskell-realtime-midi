@@ -32,6 +32,7 @@ dependencies:
 - containers
 - mtl
 - transformers
+- clock
 
 library:
   source-dirs: src
