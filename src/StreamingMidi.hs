@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
 
-module Streaming
+module StreamingMidi
   ( midiStream
   , Message (..)
   ) where
