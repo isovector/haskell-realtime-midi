@@ -7,6 +7,7 @@ module Streaming
   ) where
 
 import           Codec.Midi (Message (..))
+import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.Attoparsec.ByteString (Parser)
@@ -59,11 +60,18 @@ eventParse = do
       False -> NoteOff c n v
 
 
+unknownParse :: Parser (Maybe a)
+unknownParse = do
+  _ <- A.takeWhile (/= '\n')
+  _ <- A.string "\n"
+  pure Nothing
+
+
 midiStream :: MonadIO m => Int -> S.Stream (S.Of Message) m ()
 midiStream dev
   = void
-  . A.parsed (eventParse)
-  . C8.drop (fromIntegral . length @[] $ "Waiting for data. Press Ctrl+C to end.\nSource  Event                  Ch  Data\n")
+  . S.mapMaybe id
+  . A.parsed (fmap Just eventParse <|> unknownParse)
   . (C8.hGetContents =<<)
   . liftIO $ do
       (_, Just pout, _, _) <-
