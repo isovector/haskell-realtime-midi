@@ -8,6 +8,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.State.Class
 import           Control.Monad.Trans.State (evalStateT)
 import           Data.Bifunctor (first)
+import           Data.Ratio ((%))
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Euterpea.Music
@@ -20,10 +21,9 @@ import           Utils
 main :: IO ()
 main = flip evalStateT (Dom7 C `Over` E)
      . S.print
-     . S.map (first $ getBeat 60)
-     . clock
-     . keysDown
-     $ midiStream 20
+     . merge (keysDown $ midiStream 20)
+     . S.filter ((== 1 % 4) . timeValue)
+     $ clockStream 60
 
 -- main :: IO ()
 -- main = flip evalStateT (Dom7 C `Over` E)

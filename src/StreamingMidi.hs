@@ -1,11 +1,15 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications  #-}
-{-# OPTIONS_GHC -Wall  #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# OPTIONS_GHC -Wall            #-}
 
 module StreamingMidi
   ( midiStream
+  , clockStream
+  , merge
   , timeValue
   , getBeat
+  , beatToDuration
   , Duration (..)
   , clock
   , Message (..)
@@ -13,6 +17,8 @@ module StreamingMidi
 
 import           Codec.Midi (Message (..))
 import           Control.Applicative
+import           Control.Concurrent (forkIO)
+import           Control.Concurrent.MVar
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.Attoparsec.ByteString (Parser)
@@ -21,6 +27,7 @@ import qualified Data.Attoparsec.ByteString.Streaming as A
 import qualified Data.ByteString.Streaming.Char8 as C8
 import           Data.Foldable
 import           Data.Ratio
+import           Streaming (Stream, Of)
 import qualified Streaming.Prelude as S
 import           System.Clock
 import           System.IO
@@ -100,6 +107,13 @@ midiStream dev
       pure pout
 
 
+clockStream :: MonadIO m => Integer -> S.Stream (S.Of Duration) m ()
+clockStream bpm = S.delay dur
+                $ S.map beatToDuration $ S.iterate (+ 1 % 16) 0
+  where
+    dur = fromRational $ bpm % (60 * 8)
+
+
 clock
     :: MonadIO m
     => S.Stream (S.Of a) m r
@@ -114,8 +128,40 @@ clock s = do
 
 getBeat :: Integer -> TimeSpec -> Rational
 getBeat bpm (TimeSpec s ns) =
-  let time  = fromIntegral s + fromIntegral ns % 1000000000  -- in seconds
-      beats = bpm % 60  -- in bpm
-   in (round @Float . fromRational $ time * beats * 32) % 32
+  let dq = ns `div` 1000000                            -- in ms
+      time  = fromIntegral s + fromIntegral dq % 1000  -- in seconds
+      beats = bpm % 60                                 -- in bps
+      result = time * beats
+      den    = denominator result
+   in case den  <= 16 of
+        True  -> result
+        False ->
+          let r = fromIntegral den / 16
+           in round (fromIntegral @_ @Double (numerator result) / r) % 16
 
+
+beatToDuration :: Rational -> Duration
+beatToDuration z =
+  case denominator z of
+    1  -> Whole
+    2  -> Half
+    4  -> Quarter
+    8  -> Eighth
+    16 -> Sixteenth
+    _  -> error "i hope this doesn't happen"
+
+
+merge
+    :: forall m a b. MonadIO m
+    => Stream (Of a) IO ()
+    -> Stream (Of b) IO ()
+    -> Stream (Of (Either a b)) m ()
+merge sa sb = do
+  mvar <- liftIO $ do
+    mvar <- newEmptyMVar
+    void . forkIO $ S.mapM_ (putMVar mvar . Left) sa
+    void . forkIO $ S.mapM_ (putMVar mvar . Right) sb
+    pure mvar
+
+  S.repeatM . liftIO $ takeMVar mvar
 
