@@ -33,6 +33,15 @@ data Chord a
   | Over (Chord a) a
   deriving (Eq, Ord, Show, Functor)
 
+getRoot :: Chord a -> a
+getRoot (Maj  r)   = r
+getRoot (Maj7 r)   = r
+getRoot (Dom7 r)   = r
+getRoot (Min  r)   = r
+getRoot (Min7 r)   = r
+getRoot (Over c b) = getRoot c
+
+
 showChord :: Chord PitchClass -> String
 showChord (Maj  r)   = showPitch r
 showChord (Maj7 r)   = showPitch r ++ "M7"

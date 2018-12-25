@@ -15,6 +15,7 @@ module StreamingMidi
   , Message (..)
   ) where
 
+import Debug.Trace
 import           Codec.Midi (Message (..))
 import           Control.Applicative
 import           Control.Concurrent (forkIO)
@@ -32,6 +33,10 @@ import qualified Streaming.Prelude as S
 import           System.Clock
 import           System.IO
 import           System.Process (createProcess, shell, CreateProcess (..), StdStream (..))
+
+
+showTrace :: Show a => a -> a
+showTrace = trace =<< show
 
 
 data Duration
@@ -111,7 +116,7 @@ clockStream :: MonadIO m => Integer -> S.Stream (S.Of Duration) m ()
 clockStream bpm = S.delay dur
                 $ S.map beatToDuration $ S.iterate (+ 1 % 16) 0
   where
-    dur = fromRational $ bpm % (60 * 8)
+    dur = showTrace $ fromRational $ bpm % (60 * 8)
 
 
 clock
