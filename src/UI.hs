@@ -27,22 +27,21 @@ xDoneAttr = theBaseAttr <> attrName "X:done"
 xToDoAttr = theBaseAttr <> attrName "X:remaining"
 
 
-bar :: Chord PitchClass -> Widget n
-bar c = vBox
+bar :: Chord PitchClass -> Float -> Widget n
+bar c p = vBox
   [ center $ str $ showChord c
   , hBorder
-  , vBox
+  , vLimit 10 $ vBox
       [ hBox
-          . ( ++ [center $ str " "])
+          . intersperse (fill ' ')
+          . ( ++ [str "  "])
           . replicate 4
-          . center
-          $ str "o"
+          . vCenter
+          $ str " o"
       , hBorder
-      , updateAttrMap
+      , center $ updateAttrMap
              (mapAttrNames [ (xDoneAttr, progressCompleteAttr)
-                           , (xToDoAttr, progressIncompleteAttr)
-                           ]
-             ) $ progressBar Nothing 0.5
+                           ])   $ progressBar Nothing p
       ]
   ]
 
@@ -59,19 +58,15 @@ main = do
         . hBox
         . intersperse vBorder
         . replicate 4
-        . bar
-        $ Maj7 A `Over` D
+        $ bar (Maj7 A `Over` D) 0.25
     , appChooseCursor = const $ const $ Nothing
-    , appHandleEvent = const $ const $ halt @_ @String ()
-    , appStartEvent = pure
-    , appAttrMap = const $ theMap
+    , appHandleEvent  = const $ const $ halt @_ @String ()
+    , appStartEvent   = pure
+    , appAttrMap      = const $ theMap
     }
 
 theMap :: AttrMap
 theMap = attrMap V.defAttr
-         [ (theBaseAttr,               bg V.brightBlack)
-         , (xDoneAttr,                 V.black `on` V.white)
-         , (xToDoAttr,                 V.white `on` V.black)
-         , (progressIncompleteAttr,  fg V.yellow)
+         [ (theBaseAttr,               bg V.white)
          ]
 
