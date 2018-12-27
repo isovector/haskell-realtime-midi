@@ -33,6 +33,8 @@ dependencies:
 - mtl
 - transformers
 - clock
+- brick
+- vty
 
 library:
   source-dirs: src

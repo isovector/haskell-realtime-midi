@@ -47,7 +47,7 @@ onChord (Right (NoteOn _ n _)) = do
     (True, True) -> pure Nothing
     (True, False) -> pure Nothing -- pure $ Just "BAD ROOT NOTE"
     (False, _) ->
-      case Set.member pc $ majorPentatonic C of
+      case Set.member pc $ majorPentatonic E of
         True  -> pure Nothing
         False -> pure $ Just "BAD PENTATONIC"
 
