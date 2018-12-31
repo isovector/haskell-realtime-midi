@@ -35,6 +35,9 @@ dependencies:
 - clock
 - brick
 - vty
+- free
+- generic-lens
+- lens
 
 library:
   source-dirs: src
