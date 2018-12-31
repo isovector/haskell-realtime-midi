@@ -4,6 +4,7 @@
 
 module UI where
 
+import qualified Data.Set as Set
 import Control.Concurrent (forkIO)
 import           Brick.AttrMap
 import           Brick.BChan
@@ -36,6 +37,9 @@ import           Utils
 theBaseAttr :: AttrName
 theBaseAttr = attrName "theBase"
 
+theErrorAttr :: AttrName
+theErrorAttr = attrName "theError"
+
 
 xDoneAttr, xToDoAttr :: AttrName
 xDoneAttr = theBaseAttr <> attrName "X:done"
@@ -66,11 +70,15 @@ bar c p = vBox
 
 data ChordAppState = CAS
   { casBeat   :: Int
+  , casError  :: Bool
   , casChords :: Cofree Identity (Chord PitchClass)
   } deriving (Eq, Ord, Show, Generic)
 
 
-data ChordAppEvent = TickBeat
+data ChordAppEvent
+  = TickBeat
+  | Error
+  | Redraw
   deriving (Eq, Ord, Show, Enum, Bounded, Generic)
 
 
@@ -92,24 +100,34 @@ stateToBars s =
 
 
 
-
 chordApp :: App ChordAppState ChordAppEvent String
 chordApp = App
   { appDraw
-      = pure
+      = \s ->
+        (
+        if casError s
+           then ([withAttr theErrorAttr $ fill 'x'] ++)
+           else id
+        )
+      . pure
       . withBorderStyle unicode
       . joinBorders
       . border
       . hBox
       . intersperse vBorder
-      . stateToBars
+      $ stateToBars s
   , appChooseCursor
       = const
       $ const Nothing
   , appHandleEvent = \s e ->
       case e of
+        AppEvent Error ->
+          continue $ s & field @"casError" .~ True
+        AppEvent Redraw ->
+          continue $ s & field @"casError" .~ False
         AppEvent TickBeat ->
           continue $ s & field @"casBeat" .~ mod (casBeat s + 1) 4
+                       & field @"casError" .~ False
                        & field @"casChords" %~
                              if casBeat s == 3
                                 then runIdentity . unwrap
@@ -120,16 +138,34 @@ chordApp = App
   , appAttrMap
       = const
       . attrMap V.defAttr
-      $ pure (theBaseAttr, bg V.white)
+      $ [ (theBaseAttr,  bg V.white)
+        , (theErrorAttr, V.red `on` V.red)
+        ]
   }
 
+
+
+
+keysDown
+    :: Monad m
+    => S.Stream (S.Of Message) m r
+    -> S.Stream (S.Of Pitch) m r
+keysDown = S.mapMaybe add
+  where
+    add (NoteOn  _ n _) = Just $ pitch n
+    add _               = Nothing
 
 main :: IO ()
 main = do
   eventChan <- newBChan 10
 
+  let foo (Left True) = pure ()
+      foo (Left False) = writeBChan eventChan Error
+      foo (Right _) = writeBChan eventChan TickBeat
+
   forkIO $
-    S.mapM_ (const $ writeBChan eventChan TickBeat)
+    S.mapM_ foo
+      . merge (S.map (flip Set.member (majorPentatonic C) . fst) $ keysDown $ midiStream 20)
       . S.filter (<= Quarter)
       $ clockStream 60
 
@@ -138,7 +174,7 @@ main = do
          (V.mkVty V.defaultConfig)
          (Just eventChan)
          chordApp
-     . CAS 0
+     . CAS 0 False
      $ coiterCycle
        [ Maj C
        , Min A
