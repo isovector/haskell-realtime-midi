@@ -7,7 +7,7 @@ import           Data.Ord (comparing)
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Tuple (swap)
-import           Euterpea.Music
+import           Types
 
 
 majorPentatonic :: PitchClass -> Set PitchClass
@@ -24,14 +24,6 @@ matchSemitones r ts ps
   . Set.fromList
   $ fmap (fst . flip trans (r, 4)) ts
 
-data Chord a
-  = Maj  a
-  | Min  a
-  | Maj7 a
-  | Min7 a
-  | Dom7 a
-  | Over (Chord a) a
-  deriving (Eq, Ord, Show, Functor)
 
 getRoot :: Chord a -> a
 getRoot (Maj  r)   = r
@@ -113,3 +105,4 @@ canonicalize Ds = Ef
 canonicalize Fs = Gf
 canonicalize Gs = Af
 canonicalize z  = z
+

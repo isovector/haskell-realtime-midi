@@ -11,11 +11,11 @@ import           Data.Bifunctor (first)
 import           Data.Ratio ((%))
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Euterpea.Music
 import           Streaming.Prelude (Stream, Of)
 import qualified Streaming.Prelude as S
 import           StreamingMidi
 import           Utils
+import           Types
 
 
 main :: IO ()
