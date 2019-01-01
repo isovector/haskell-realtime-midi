@@ -7,19 +7,20 @@
 
 module Exercises.Chords where
 
-import Control.Monad.Trans.Class (lift)
 import           Control.Comonad.Cofree (unwrap)
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class (MonadIO (..))
 import           Control.Monad.State.Class
+import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.State.Strict (StateT (..), evalStateT)
 import           Data.Generics.Product
 import           Data.List (inits)
 import           Data.Set (Set)
 import           GHC.Generics
-import           Streaming (hoist)
+import           Streaming (hoist, distribute)
 import qualified Streaming.Prelude as S
+import           StreamingMidi
 import           Types
 import           Utils
 
@@ -28,6 +29,7 @@ data Output
   = Experience Int
   | Message String
   | Error
+  deriving (Eq, Ord, Show)
 
 
 data Exercise s i = Exercise
@@ -60,7 +62,8 @@ runExercises
     -> Stream (Of Output) m ()
 runExercises (ex : exs) s = do
   let estate = ExerciseState ex exs difficulty $ exState ex
-  hoist (flip evalStateT estate)
+  flip evalStateT estate
+    . distribute
     . S.mapM ( \e -> do
           case e of
             Experience i -> do
@@ -119,4 +122,11 @@ mkStreamFunc name chords =
         gets (show . extract) >>= S.yield . Message
       _ -> pure ()
 
+
+main :: IO ()
+main = do
+  S.print
+   . runExercises (genExercises $ Maj C)
+   . consecutiveKeysDown
+   $ midiStream 20
 

@@ -19,6 +19,29 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Tuple (swap)
 import           Types
+import qualified Streaming.Prelude as S
+import           StreamingMidi
+
+
+keysDown
+    :: Monad m
+    => Stream (Of Message) m r
+    -> Stream (Of (Set Pitch)) m r
+keysDown = S.scan (flip add) mempty id
+  where
+    add (NoteOn  _ n _) = Set.insert $ pitch n
+    add (NoteOff _ n _) = Set.delete $ pitch n
+    add _               = id
+
+consecutiveKeysDown
+    :: Monad m
+    => Stream (Of Message) m r
+    -> Stream (Of (Set Pitch)) m r
+consecutiveKeysDown = S.scan (flip add) mempty id
+  where
+    add (NoteOn  _ n _) = Set.insert $ pitch n
+    add (NoteOff _ n _) = mempty
+    add _               = id
 
 
 majorPentatonic :: PitchClass -> Set PitchClass
