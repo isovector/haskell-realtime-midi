@@ -1,8 +1,19 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module Utils where
+module Utils
+  ( module Utils
+  , Cofree (..)
+  , Identity (..)
+  , coerce
+  , Comonad (..)
+  ) where
 
-import           Data.List (minimumBy)
+import           Control.Comonad
+import           Control.Comonad.Cofree
+import           Data.Coerce
+import           Data.Functor.Identity
+import           Data.List (minimumBy, uncons)
+import           Data.Maybe (fromJust)
 import           Data.Ord (comparing)
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -14,13 +25,18 @@ majorPentatonic :: PitchClass -> Set PitchClass
 majorPentatonic = Set.fromList . take 5 . iterate rotate5
 
 
+circleOfFifths :: PitchClass -> [PitchClass]
+circleOfFifths = take 12 . iterate rotate5
+
+
 matchSemitones
-    :: PitchClass
+    :: (Set PitchClass -> Set PitchClass -> Bool)
+    ->  PitchClass
     -> [Int]
     -> Set Pitch
     -> Bool
-matchSemitones r ts ps
-  = (== Set.map fst ps)
+matchSemitones f r ts ps
+  = (f $ Set.map fst ps)
   . Set.fromList
   $ fmap (fst . flip trans (r, 4)) ts
 
@@ -47,18 +63,37 @@ rotate5 :: PitchClass -> PitchClass
 rotate5 pc = fst $ trans 7 (pc, 4)
 
 
-matches :: Chord PitchClass -> Set Pitch -> Bool
-matches (Maj  r) ps = matchSemitones r [0, 4, 7] ps
-matches (Maj7 r) ps = matchSemitones r [0, 4, 7, 11] ps
-matches (Dom7 r) ps = matchSemitones r [0, 4, 7, 10] ps
-matches (Min  r) ps = matchSemitones r [0, 3, 7] ps
-matches (Min7 r) ps = matchSemitones r [0, 3, 7, 10] ps
-matches (Over c b) ps
+isCompleteChord :: Chord PitchClass -> Set Pitch -> Bool
+isCompleteChord = matches (==)
+
+isIncompleteChord :: Chord PitchClass -> Set Pitch -> Bool
+isIncompleteChord = matches Set.isSubsetOf
+
+getN :: Int -> Cofree Identity a -> [a]
+getN 0 _         = []
+getN n (a :< as) = a : getN (n - 1) (coerce as)
+
+
+coiterCycle :: [a] -> Cofree Identity a
+coiterCycle = unfold (coerce . fromJust . uncons) . cycle
+
+
+matches
+    :: (Set PitchClass -> Set PitchClass -> Bool)
+    -> Chord PitchClass
+    -> Set Pitch
+    -> Bool
+matches f (Maj  r) ps = matchSemitones f r [0, 4, 7] ps
+matches f (Maj7 r) ps = matchSemitones f r [0, 4, 7, 11] ps
+matches f (Dom7 r) ps = matchSemitones f r [0, 4, 7, 10] ps
+matches f (Min  r) ps = matchSemitones f r [0, 3, 7] ps
+matches f (Min7 r) ps = matchSemitones f r [0, 3, 7, 10] ps
+matches f (Over c b) ps
   | Set.null ps = False
   | otherwise =
       let bp  = minimumBy (comparing swap) ps
           ps' = Set.delete bp ps  -- TODO: only delete if not in the chord
-       in fst bp == b && matches c ps'
+       in fst bp == b && matches f c ps'
 
 
 showPitch :: PitchClass -> String

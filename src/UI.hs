@@ -4,8 +4,6 @@
 
 module UI where
 
-import qualified Data.Set as Set
-import Control.Concurrent (forkIO)
 import           Brick.AttrMap
 import           Brick.BChan
 import           Brick.Main
@@ -17,14 +15,17 @@ import           Brick.Widgets.Center
 import           Brick.Widgets.Core
 import           Brick.Widgets.ProgressBar
 import           Control.Comonad.Cofree (Cofree (..), unwrap, unfold)
+import           Control.Concurrent (forkIO)
 import           Control.Lens hiding ((:<))
 import           Control.Monad (void)
+import           Control.Monad.IO.Class (MonadIO (..))
 import           Data.Coerce (coerce)
 import           Data.Functor.Identity (Identity (..))
 import           Data.Generics.Product
 import           Data.List (intersperse)
 import           Data.Maybe (fromJust)
 import           Data.Ratio
+import qualified Data.Set as Set
 import           GHC.Generics (Generic)
 import           Graphics.Vty (defAttr)
 import qualified Graphics.Vty as V
@@ -82,14 +83,6 @@ data ChordAppEvent
   deriving (Eq, Ord, Show, Enum, Bounded, Generic)
 
 
-
-getN :: Int -> Cofree Identity a -> [a]
-getN 0 _         = []
-getN n (a :< as) = a : getN (n - 1) (coerce as)
-
-
-coiterCycle :: [a] -> Cofree Identity a
-coiterCycle = unfold (coerce . fromJust . uncons) . cycle
 
 
 stateToBars :: ChordAppState -> [Widget n]
@@ -155,19 +148,16 @@ keysDown = S.mapMaybe add
     add (NoteOn  _ n _) = Just $ pitch n
     add _               = Nothing
 
-main :: IO ()
-main = do
+
+runUI :: S.Stream (S.Of (Either Bool Message)) IO () -> IO ()
+runUI s = do
   eventChan <- newBChan 10
 
   let foo (Left True) = pure ()
       foo (Left False) = writeBChan eventChan Error
       foo (Right _) = writeBChan eventChan TickBeat
 
-  forkIO $
-    S.mapM_ foo
-      . merge (S.map (flip Set.member (majorPentatonic C) . fst) $ keysDown $ midiStream 20)
-      . S.filter (<= Quarter)
-      $ clockStream 60
+  forkIO $ liftIO $ S.mapM_ foo s
 
   void
      . customMain

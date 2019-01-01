@@ -38,6 +38,7 @@ dependencies:
 - free
 - generic-lens
 - lens
+- comonad
 
 library:
   source-dirs: src

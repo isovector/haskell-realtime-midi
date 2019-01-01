@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Types
   ( module Types
@@ -7,9 +8,16 @@ module Types
   , AbsPitch
   , trans
   , pitch
+  , module Streaming
   ) where
 
 import Euterpea.Music
+import Streaming (Stream (..), Of (..))
+
+
+newtype Difficulty = Difficulty
+  { getDifficulty :: Int
+  } deriving (Eq, Ord, Num, Show, Enum, Bounded)
 
 
 data Duration
@@ -20,6 +28,13 @@ data Duration
   | Sixteenth
   | Dotted Duration
   deriving (Eq, Ord, Show)
+
+
+data Inversion
+  = InvRoot
+  | InvFirst
+  | InvSecond
+  deriving (Eq, Ord, Show, Enum, Bounded)
 
 
 data Chord a
